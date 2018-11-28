@@ -66,7 +66,11 @@
     (teardown! [_ test node]
       (info node "tearing down etcd")
       (cu/stop-daemon! binary pidfile)
-      (c/su (c/exec :rm :-rf dir)))))
+      (c/su (c/exec :rm :-rf dir)))
+
+    db/LogFiles
+    (log-files [_ test node]
+      [logfile])))
 
 (defn etcd-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
