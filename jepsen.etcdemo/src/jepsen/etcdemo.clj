@@ -9,6 +9,9 @@
             [jepsen.os.debian :as debian]))
 
 (def dir "/opt/etcd")
+(def binary "etcd")
+(def logfile (str dir "/etcd.log"))
+(def pidfile (str dir "/etcd.pid"))
 
 (defn node-url
   "An HTTP url for connecting to a node on a particular port."
@@ -43,10 +46,27 @@
         (info node "setting up etcd" version)
         (let [url (str "https://storage.googleapis.com/etcd/" version
                        "/etcd-" version "-linux-amd64.tar.gz")]
-          (cu/install-archive! url dir))))
+          (cu/install-archive! url dir)
+          (cu/start-daemon!
+            {:logfile logfile
+             :pidfile pidfile
+             :chdir dir}
+            binary
+            :--log-output                   :stderr
+            :--name                         node
+            :--listen-peer-urls             (peer-url node)
+            :--listen-client-urls           (client-url node)
+            :--advertise-client-urls        (client-url node)
+            :--initial-cluster-state        :new
+            :--initial-advertise-peer-urls  (peer-url node)
+            :--initial-cluster              (initial-cluster test))
+          ; Quick hack to get us through demo
+          (Thread/sleep 10000))))
 
     (teardown! [_ test node]
-      (info "Tearing down db"))))
+      (info node "tearing down etcd")
+      (cu/stop-daemon! binary pidfile)
+      (c/su (c/exec :rm :-rf dir)))))
 
 (defn etcd-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
