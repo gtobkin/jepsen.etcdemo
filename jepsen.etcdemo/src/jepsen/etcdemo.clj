@@ -16,7 +16,7 @@
   (reify db/DB
     (setup! [_ test node]
       (c/su
-        (info "Setting up etcd")
+        (info node "setting up etcd" version)
         (let [url (str "https://storage.googleapis.com/etcd/" version
                        "/etcd-" version "-linux-amd64.tar.gz")]
           (cu/install-archive! url dir))))
@@ -30,7 +30,7 @@
   [opts]
   (merge tests/noop-test
          opts
-         {:name "etd"
+         {:name "etcd"
           :db (db "v3.1.5")
           :os debian/os}))
 
