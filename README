@@ -1,0 +1,104 @@
+
+
+                   ___ _______ ____   ______ ______ ___  ___
+                  /  //  ____//    \ /  ___//  ___//  | /  /
+                 /  //  /_   /  /  //  /__ /  /_  /   |/  /
+                  /  //  __/  /  ___//__   //  __/ /  /    /
+             __/  //  /___ /  /   ___/  //  /__ /  /|   /
+            /____//______//__/   /_____//_____//__/ |__/
+
+
+
+Welcome to the Jepsen control node. This is where you'll run Jepsen tests.
+
+This cluster has a series of DB nodes, which will run the distributed
+system being tested. They're called `n1`, `n2`, ..., in /etc/hosts, and the raw EC2 names are listed in your home directory, in ~/nodes. Jepsen
+has an SSH key (~/.ssh/id_rsa) that can log into these nodes. You can try this
+for yourself: `ssh n1`. The `admin` user has passwordless sudo
+access on every node.
+
+The Jepsen git repository, with the core library and many tests, is in
+~/jepsen. You can run tests from that directory. For instance:
+
+```
+cd ~/jepsen/etcd
+lein run test --username admin --nodes-file ~/nodes --concurrency 2n
+```
+
+... which will often (not necessarily) show a nonlinearizable result. If the
+history it encounters is too expensive to verify, it may hang the process or
+return :unknown.
+
+## Results
+
+Test results will be available in store/latest/. You can view results on the
+command line, mount this node over SSH, or start a web server to browse
+results. For example:
+
+```
+cd ~/jepsen/etcd
+jepsen-serve
+```
+
+... will run a publically accessible web server on port 8080, showing all the
+test results in ~/jepsen/etcd/store/.
+
+
+## Updating
+
+To fetch the latest Jepsen code, cd ~/jepsen && git pull. If your test depends
+on a -SNAPSHOT version of Jepsen and you'd like to use the local code, rather
+than whatever's on the Clojars repository, cd ~/jepsen/jepsen && lein do clean,
+install, which will install the current code to the local ~/.m2 repository.
+
+
+## Troubleshooting
+
+Check that you're able to log in to a DB node by running
+
+```
+ssh n1
+```
+
+or, if the alias is broken, try
+
+```
+ssh `head -1 ~/nodes`
+```
+
+If this complains that your SSH key is invalid, you may have SSH agent
+forwarding enabled; SSH is trying to use your *local* machine's keys instead of
+the *control* node. You can disable agent forwarding with `ssh -a`: log in to
+the control node like so:
+
+```
+ssh -a admin@ec2-...
+```
+
+If you encounter SSH auth errors from Jepsen like "HostKey rejected", it's
+possible that some nodes were too slow to respond during cluster
+initialization, and their host keys are missing. To fetch their host keys
+again, run `rescan-nodes`.
+
+Many of the older tests assume a root user, and that your nodes are named `n1`,
+`n2`, etc. You may need to edit those tests to use the admin user, and the
+nodes from ~/nodes:
+
+```
+{:nemesis ...
+ :generator ...
+ :ssh {:username "admin"}
+ :nodes ["ec2-54-205-5-100.compute-1.amazonaws.com", ...]}
+```
+
+## Licenses
+
+This VM includes Oracle JDK8, which is redistributed under the following
+license agreements:
+
+http://www.oracle.com/technetwork/java/javase/jdk-8-readme-2095712.html#redistribution
+http://www.oracle.com/technetwork/java/javase/terms/license/index.html
+
+By using Oracle's Java Platform, you agree to Oracle's JDK and JRE licenses. If
+you would prefer a FOSS java implementation, you may `apt-get install
+openjdk-8-jdk`, and use `update-alternatives` to select it.
