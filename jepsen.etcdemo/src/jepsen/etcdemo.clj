@@ -6,6 +6,7 @@
                     [client   :as client]
                     [control  :as c]
                     [db       :as db]
+                    [generator :as gen]
                     [tests    :as tests]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]))
@@ -51,7 +52,12 @@
 
   (setup! [this test])
 
-  (invoke! [_ test op])
+  (invoke! [_ test op]
+    (case (:f op)
+          :read (assoc op
+                       :type :ok
+                       :value (v/get conn "foo")))) ; dummy key "foo" for now
+
 
   (teardown! [this test])
 
