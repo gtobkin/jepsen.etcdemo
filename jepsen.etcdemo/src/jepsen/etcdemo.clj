@@ -64,7 +64,11 @@
                        ; Single dummy key, "foo", for now.
                        :value (parse-long (v/get conn "foo")))
           :write (do (v/reset! conn "foo" (:value op))
-                     (assoc op :type, :ok))))
+                     (assoc op :type, :ok))
+          :cas (let [[old new] (:value op)]
+                 (assoc op :type (if (v/cas! conn "foo" old new)
+                                   :ok
+                                   :fail)))))
 
 
   (teardown! [this test])
@@ -97,7 +101,7 @@
             :--initial-advertise-peer-urls  (peer-url node)
             :--initial-cluster              (initial-cluster test))
           ; Quick hack to get us through demo
-          (Thread/sleep 10000))))
+          (Thread/sleep 5000))))
 
     (teardown! [_ test node]
       (info node "tearing down etcd")
@@ -118,7 +122,7 @@
           :db (db "v3.1.5")
           :os debian/os
           :client (Client. nil) ; no connection for now; this is seed client
-          :generator (->> (gen/mix [r w])
+          :generator (->> (gen/mix [r w cas])
                           (gen/stagger 1)
                           (gen/nemesis nil)
                           (gen/time-limit 15))}))
