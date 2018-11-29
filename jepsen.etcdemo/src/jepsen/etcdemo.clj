@@ -76,12 +76,15 @@
                                       :ok
                                       :fail))))
 
-      (catch java.net.SocketTimeoutException e
+      (catch java.net.SocketTimeoutException ex
         (assoc op
                :type (if (= :read (:f op)) :fail :info)
                :error :timeout))
 
-      (catch [:errorCode 100] e
+      (catch java.net.ConnectException ex
+        (assoc op :type :fail, :error :connect))
+
+      (catch [:errorCode 100] ex
         (assoc op :type :fail, :error :not-found))))
 
 
