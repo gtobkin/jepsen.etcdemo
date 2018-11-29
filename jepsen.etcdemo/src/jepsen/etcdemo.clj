@@ -7,6 +7,7 @@
                     [control  :as c]
                     [db       :as db]
                     [generator :as gen]
+                    [nemesis :as nemesis]
                     [tests    :as tests]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]
@@ -129,14 +130,20 @@
           :db (db "v3.1.5")
           :os debian/os
           :client (Client. nil) ; no connection for now; this is seed client
+          :nemesis (nemesis/partition-random-halves)
           :model (model/cas-register)
           :checker (checker/compose {:linear (checker/linearizable)
                                      :perf (checker/perf)
                                      :timeline (timeline/html)})
           :generator (->> (gen/mix [r w cas])
-                          (gen/stagger 1)
-                          (gen/nemesis nil)
-                          (gen/time-limit 15))}))
+                          (gen/stagger 0.1)
+                          (gen/nemesis (->> [(gen/sleep 5)
+                                             {:type :info, :f :start, :value nil}
+                                             (gen/sleep 5)
+                                             {:type :info, :f :stop, :value nil}]
+                                            cycle
+                                            gen/seq))
+                          (gen/time-limit (opts :time-limit)))}))
 
 (defn -main
   "Handles command line arguments. Can either run a test, or a web server for
