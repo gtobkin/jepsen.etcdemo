@@ -44,6 +44,11 @@
 (defn w   [_ _] {:type :invoke, :f :write,  :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke, :f :cas,    :value [(rand-int 5) (rand-int 5)]})
 
+(defn parse-long
+  "Parses a string to a Long. Passes through 'nil'."
+  [s]
+  (when s (Long/parseLong s)))
+
 (defrecord Client [conn]
   client/Client
   (open! [this test node]
@@ -56,7 +61,10 @@
     (case (:f op)
           :read (assoc op
                        :type :ok
-                       :value (v/get conn "foo")))) ; dummy key "foo" for now
+                       ; Single dummy key, "foo", for now.
+                       :value (parse-long (v/get conn "foo")))
+          :write (do (v/reset! conn "foo" (:value op))
+                     (assoc op :type, :ok))))
 
 
   (teardown! [this test])
@@ -110,7 +118,7 @@
           :db (db "v3.1.5")
           :os debian/os
           :client (Client. nil) ; no connection for now; this is seed client
-          :generator (->> r
+          :generator (->> (gen/mix [r w])
                           (gen/stagger 1)
                           (gen/nemesis nil)
                           (gen/time-limit 15))}))
