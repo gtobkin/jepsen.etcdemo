@@ -7,6 +7,7 @@
                     [control  :as c]
                     [db       :as db]
                     [generator :as gen]
+                    [independent :as independent]
                     [nemesis :as nemesis]
                     [tests    :as tests]]
             [jepsen.control.util :as cu]
@@ -63,29 +64,32 @@
   (setup! [this test])
 
   (invoke! [_ test op]
-    (try+
-      (case (:f op)
-            :read (try (assoc op
-                         :type :ok
-                         ; Single dummy key, "foo", for now.
-                         :value (parse-long (v/get conn "foo" {:quorum? true}))))
-            :write (do (v/reset! conn "foo" (:value op))
-                       (assoc op :type, :ok))
-            :cas (let [[old new] (:value op)]
-                    (assoc op :type (if (v/cas! conn "foo" old new)
-                                      :ok
-                                      :fail))))
+    (let [[k v] (:value op)]
+      (try+
+        (case (:f op)
+              :read (let [value (-> conn
+                                    (v/get k {:quorum? true})
+                                    parse-long)]
+                      (assoc op :type :ok, :value (independent/tuple k value)))
 
-      (catch java.net.SocketTimeoutException ex
-        (assoc op
-               :type (if (= :read (:f op)) :fail :info)
-               :error :timeout))
+              :write (do (v/reset! conn k v)
+                         (assoc op :type :ok))
 
-      (catch java.net.ConnectException ex
-        (assoc op :type :fail, :error :connect))
+              :cas (let [[old new] v]
+                      (assoc op :type (if (v/cas! conn k old new)
+                                        :ok
+                                        :fail))))
 
-      (catch [:errorCode 100] ex
-        (assoc op :type :fail, :error :not-found))))
+        (catch java.net.SocketTimeoutException ex
+          (assoc op
+                 :type (if (= :read (:f op)) :fail :info)
+                 :error :timeout))
+
+        (catch java.net.ConnectException ex
+          (assoc op :type :fail, :error :connect))
+
+        (catch [:errorCode 100] ex
+          (assoc op :type :fail, :error :not-found)))))
 
 
   (teardown! [this test])
@@ -141,18 +145,26 @@
           :client (Client. nil) ; no connection for now; this is seed client
           :nemesis (nemesis/partition-random-halves)
           :model (model/cas-register)
-          :checker (checker/compose {:linear (checker/linearizable)
-                                     :perf (checker/perf)
-                                     :timeline (timeline/html)})
-          :generator (->> (gen/mix [r w cas])
-                          (gen/stagger 0.1)
+          :checker (checker/compose
+                     {:perf (checker/perf)
+                      :indep (independent/checker
+                               (checker/compose
+                                 {:timeline (timeline/html)
+                                            :linear (checker/linearizable)}))})
+          :generator (->> (independent/concurrent-generator
+                            10
+                            (range)
+                            (fn [k]
+                              (->> (gen/mix [r w cas])
+                                   (gen/stagger 0.1)
+                                   (gen/limit 100))))
                           (gen/nemesis (->> [(gen/sleep 5)
                                              {:type :info, :f :start, :value nil}
                                              (gen/sleep 5)
                                              {:type :info, :f :stop, :value nil}]
                                             cycle
                                             gen/seq))
-                          (gen/time-limit (opts :time-limit)))}))
+                          (gen/time-limit (:time-limit opts)))}))
 
 (defn -main
   "Handles command line arguments. Can either run a test, or a web server for
