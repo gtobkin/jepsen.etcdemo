@@ -59,7 +59,7 @@
   client/Client
   (open! [this test node]
     (assoc this :conn (v/connect (client-url node)
-               {:timeout 5000})))
+                                 {:timeout 5000})))
 
   (setup! [this test])
 
@@ -67,18 +67,18 @@
     (let [[k v] (:value op)]
       (try+
         (case (:f op)
-              :read (let [value (-> conn
-                                    (v/get k {:quorum? true})
-                                    parse-long)]
-                      (assoc op :type :ok, :value (independent/tuple k value)))
+          :read (let [value (-> conn
+                                (v/get k {:quorum? true})
+                                parse-long)]
+                  (assoc op :type :ok, :value (independent/tuple k value)))
 
-              :write (do (v/reset! conn k v)
-                         (assoc op :type :ok))
+          :write (do (v/reset! conn k v)
+                     (assoc op :type :ok))
 
-              :cas (let [[old new] v]
-                      (assoc op :type (if (v/cas! conn k old new)
-                                        :ok
-                                        :fail))))
+          :cas (let [[old new] v]
+                 (assoc op :type (if (v/cas! conn k old new)
+                                   :ok
+                                   :fail))))
 
         (catch java.net.SocketTimeoutException ex
           (assoc op
@@ -150,7 +150,7 @@
                       :indep (independent/checker
                                (checker/compose
                                  {:timeline (timeline/html)
-                                            :linear (checker/linearizable)}))})
+                                  :linear (checker/linearizable)}))})
           :generator (->> (independent/concurrent-generator
                             10
                             (range)
