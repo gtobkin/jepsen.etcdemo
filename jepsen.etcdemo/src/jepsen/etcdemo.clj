@@ -12,6 +12,7 @@
             [jepsen.os.debian :as debian]
             [knossos.model :as model]
             [slingshot.slingshot :refer [try+]]
+            [jepsen.checker.timeline :as timeline]
             [verschlimmbesserung.core :as v]))
 
 (def dir "/opt/etcd")
@@ -129,7 +130,9 @@
           :os debian/os
           :client (Client. nil) ; no connection for now; this is seed client
           :model (model/cas-register)
-          :checker (checker/linearizable)
+          :checker (checker/compose {:linear (checker/linearizable)
+                                     :perf (checker/perf)
+                                     :timeline (timeline/html)})
           :generator (->> (gen/mix [r w cas])
                           (gen/stagger 1)
                           (gen/nemesis nil)
