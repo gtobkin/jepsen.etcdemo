@@ -1,8 +1,8 @@
 (ns jepsen.etcdemo
   (:require [clojure.tools.logging :refer :all]
             [clojure.string :as str]
-            [verschlimmbesserung.core :as v]
-            [jepsen [cli      :as cli]
+            [jepsen [checker  :as checker]
+                    [cli      :as cli]
                     [client   :as client]
                     [control  :as c]
                     [db       :as db]
@@ -10,7 +10,9 @@
                     [tests    :as tests]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]
-            [slingshot.slingshot :refer [try+]]))
+            [knossos.model :as model]
+            [slingshot.slingshot :refer [try+]]
+            [verschlimmbesserung.core :as v]))
 
 (def dir "/opt/etcd")
 (def binary "etcd")
@@ -126,6 +128,8 @@
           :db (db "v3.1.5")
           :os debian/os
           :client (Client. nil) ; no connection for now; this is seed client
+          :model (model/cas-register)
+          :checker (checker/linearizable)
           :generator (->> (gen/mix [r w cas])
                           (gen/stagger 1)
                           (gen/nemesis nil)
