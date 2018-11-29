@@ -1,10 +1,12 @@
 (ns jepsen.etcdemo
   (:require [clojure.tools.logging :refer :all]
             [clojure.string :as str]
-            [jepsen [cli :as cli]
-                    [control :as c]
-                    [db :as db]
-                    [tests :as tests]]
+            [verschlimmbesserung.core :as v]
+            [jepsen [cli      :as cli]
+                    [client   :as client]
+                    [control  :as c]
+                    [db       :as db]
+                    [tests    :as tests]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]))
 
@@ -36,6 +38,26 @@
        (map (fn [node]
               (str node "=" (peer-url node))))
        (str/join ",")))
+
+(defn r   [_ _] {:type :invoke, :f :read,   :value nil})
+(defn w   [_ _] {:type :invoke, :f :write,  :value (rand-int 5)})
+(defn cas [_ _] {:type :invoke, :f :cas,    :value [(rand-int 5) (rand-int 5)]})
+
+(defrecord Client [conn]
+  client/Client
+  (open! [this test node]
+    (assoc this :conn (v/connect (client-url node)
+               {:timeout 5000})))
+
+  (setup! [this test])
+
+  (invoke! [_ test op])
+
+  (teardown! [this test])
+
+  (close! [_ test]
+    ; Connection isn't (yet?) stateful; no destruction required here
+    ))
 
 (defn db
   "Constructs a database for the given etcd version."
@@ -80,7 +102,12 @@
          opts
          {:name "etcd"
           :db (db "v3.1.5")
-          :os debian/os}))
+          :os debian/os
+          :client (Client. nil) ; no connection for now; this is seed client
+          :generator (->> r
+                          (gen/stagger 1)
+                          (gen/nemesis nil)
+                          (gen/time-limit 15))}))
 
 (defn -main
   "Handles command line arguments. Can either run a test, or a web server for
